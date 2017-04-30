@@ -29,6 +29,76 @@ def root():
     return 'hello there'
 
 
+@app.route('/questions', methods=['POST', 'GET'], defaults={'course': None, 'assignment': None, 'question': None})
+@app.route('/questions/<course>/<assignment>/<question>', methods=['PUT', 'DELETE'])
+@require_appkey
+def questions(course, assignment, question):
+    mongo_questions = mongo.db.questions
+    teacheruser = user_name(request.args.get('key'))
+
+    # get all questions for an assignment
+    if request.method == 'GET':
+        questions_resp = mongo_questions.find({'assignment_num': request.args.get('assignment_num'),
+                                               'course_num': request.args.get('course_num'),
+                                               'teacheruser': teacheruser})
+        return json_util.dumps(questions_resp)
+
+    # insert new question into assignment
+    if request.method == 'POST':
+        existing_question = mongo_questions.find_one({'number': request.args.get('number'),
+                                                     'assignment_num': request.args.get('assignment_num'),
+                                                     'course_num': request.args.get('course_num'),
+                                                     'teacheruser': teacheruser})
+        if existing_question is None:
+            mongo_questions.insert({'number': request.args.get('number'),
+                                    'assignment_num': request.args.get('assignment_num'),
+                                    'course_num': request.args.get('course_num'),
+                                    'question': request.args.get('question'),
+                                    'question_type': request.args.get('question_type'),
+                                    'options': request.args.get('options'),
+                                    'answer': request.args.get('answer'),
+                                    'teacheruser': teacheruser})
+            return 'Added'
+
+        return 'already exists!'
+
+    # update a question
+    if request.method == 'PUT':
+        existing_question = mongo_questions.find_one({'number': question,
+                                                      'assignment_num': assignment,
+                                                      'course_num': course,
+                                                      'teacheruser': teacheruser})
+        if existing_question is not None:
+            print(request.args)
+            mongo_questions.update_one({'number': question,
+                                        'assignment_num': assignment,
+                                        'course_num': course,
+                                        'teacheruser': teacheruser},
+                                       {'$set': {'question': request.args.get('question'),
+                                                 'question_type': request.args.get('question_type'),
+                                                 'options': request.args.get('options'),
+                                                 'answer': request.args.get('answer')}})
+
+            return 'Updated'
+
+        return 'Update failed'
+
+    # delete a question
+    if request.method == 'DELETE':
+        existing_question = mongo_questions.find_one({'number': question,
+                                                      'assignment_num': assignment,
+                                                      'course_num': course,
+                                                      'teacheruser': teacheruser})
+        if existing_question is not None:
+            mongo_questions.delete_one({'number': question,
+                                        'assignment_num': assignment,
+                                        'course_num': course,
+                                        'teacheruser': teacheruser})
+            return 'Deleted'
+
+        return 'Delete failed'
+
+
 def obj_dict(obj):
     return obj.__dict__
 
